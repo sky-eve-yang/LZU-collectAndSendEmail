@@ -63,8 +63,9 @@
 			return {
 				imageValue:[],
 				submitClass: "submit-button-before-upload",
+				isSubmitting: false,  // 添加一个标志变量来控制提交状态
 				survey: {
-					title: "无高校证明开具",
+					title: "无高校学生登记表证明",
 					questions: [
 						{
 							type: "image",
@@ -75,91 +76,56 @@
 							type: "text",
 							title: "姓名",
 							placeholder: "姓名",
-							answer: ""
+							answer: "231"
 						},
 						{
 							type: "radio",
 							title: "性别",
 							options: ["男", "女"],
-							values: [0, 1],
+							values: ["0", "1"],
 							answer: ''
 						},
 						{
 							type: "text",
 							title: "毕业学院（需要与毕业证保持一致）",
 							placeholder: "毕业学院",
-							answer: ""
+							answer: "213"
 						},
-						// {
-						// 	type: "select",
-						// 	title: "毕业学院",
-						// 	options: [
-						// 		"萃英学院",
-						// 		"政治与国际关系学院",
-						// 		"艺术学院",
-						// 		"管理学院",
-						// 		"经济学院",
-						// 		"马克思主义学院",
-						// 		"法学院",
-						// 		"外国语学院",
-						// 		"哲学社会学院",
-						// 		"历史文化学院",
-						// 		"新闻与传播学院",
-						// 		"文学院",
-						// 		"生态学院",
-						// 		"材料与能源学院",
-						// 		"动物医学与生物安全学院",
-						// 		"地质科学与矿产资源学院",
-						// 		"土木工程与力学学院",
-						// 		"资源环境学院",
-						// 		"大气科学学院",
-						// 		"生命科学学院",
-						// 		"草地农业科技学院",
-						// 		"化学化工学院",
-						// 		"信息科学与工程学院",
-						// 		"核科学与技术学院",
-						// 		"物理科学与技术学院",
-						// 		"数学与统计学院",
-						// 		"护理学院",
-						// 		"口腔医学院",
-						// 		"第二临床医学院",
-						// 		"第一临床医学院",
-						// 		"基础医学院",
-						// 		"药学院",
-						// 		"公共卫生学院",
-						// 		"其他"
-						// 	],
-						// 	answer: ""
-						// },
 						{
 							type: "text",
 							title: "专业名称（需要与毕业证保持一致）",
 							placeholder: "专业名称",
-							answer: ""
+							answer: "123"
 						},
 						{
 							type: "number",
 							title: "请输入毕业年份（格式：2020）",
 							placeholder: "毕业年份需要与毕业证保持一致",
-							answer: ""
+							answer: "2020"
 						},
 						{
 							type: "number",
 							title: "请输入您的身份证号码",
 							placeholder: "请输入18位合法身份证号码",
-							answer: ""
+							answer: "371521202233331123"
 						},
 						{
 							type: "number",
 							title: "联系方式",
 							placeholder: "请输入手机号",
-							answer: ""
+							answer: "15022221140"
 						},
 						{
 							type: "textarea",
 							title: "邮寄地址",
 							placeholder: "请输入详细地址",
-							answer: ""
+							answer: "23213"
+						},
+						{
+							type: "text",
+							title: "邮箱",
+							placeholder: "请输入邮箱（后续将通过邮箱发送证明邮寄通知）",
+							answer: "123@qq.com"
 						}
 						
 					]
@@ -214,50 +180,86 @@
 			fail(e){
 				console.log('上传失败：',e)
 			},
-			handleSubmit() {
-				console.log("this.survey.questions", this.survey.questions);
-				let emptyQuestions = [];
-				let invalidPhoneIndex = -1;
-				let invalidIDCardIndex = -1;
-				let invalidGradeIndex = -1;
-				let imageIndex=-1;
+			
+			// JS 等待函数
+			delay(time) {
+			    return new Promise(resolve => setTimeout(resolve, time));
+			},
+			
+			// 验证输入
+			validateInput() {
+				const validationResults = {
+					emptyQuestions: [],
+					invalidPhoneIndex: -1,
+					invalidIDCardIndex: -1,
+					invalidGradeIndex: -1,
+					invalidEmailIndex: -1,
+					imageIndex: -1,
+				};
+		
 				const phonePattern = /^1[3456789]\d{9}$/;
 				const idCardPattern = /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/;
-				const GradeIndex = /^\d{4}$/;
+				const GradePattern = /^\d{4}$/;
+				const emailPattern = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 				const currentDate = new Date();
 				const currentYear = currentDate.getFullYear();
-				
+		
 				for (let index = 0; index < this.survey.questions.length; index++) {
-					let question = this.survey.questions[index]
-					
+					const question = this.survey.questions[index];
 					if (question.type === 'image' && question.title === '上传毕业证书') {
-						imageIndex = index;
-						if (!this.survey.questions[0].answer) {
+						validationResults.imageIndex = index;
+						if (!question.answer) {
 							uni.showToast({
 								title: `请上传图片`,
 								icon: 'none',
 								duration: 2000
 							});
-							return
+							return validationResults;
 						}
 					}
-					if (question.type === 'number' && question.title.indexOf('请输入毕业年份') !== -1 && ( !GradeIndex.test(question.answer) || question.answer >  currentYear) ) {
-						invalidGradeIndex = index
+		
+					if (question.type === 'number' && question.title.includes('请输入毕业年份') && (!GradePattern.test(question.answer) || question.answer > currentYear)) {
+						validationResults.invalidGradeIndex = index;
 					}
+		
 					if (!question.answer && question.answer !== 0) {
-						emptyQuestions.push(index);
+						validationResults.emptyQuestions.push(index);
 					}
-					if (question.type === 'number' && question.title === '请输入您的身份证号码' && !idCardPattern.test(
-							question
-							.answer)) {
-						invalidIDCardIndex = index;
+		
+					if (question.type === 'number' && question.title === '请输入您的身份证号码' && !idCardPattern.test(question.answer)) {
+						validationResults.invalidIDCardIndex = index;
 					}
-					if (question.type === 'number' && question.title === '联系方式' && !phonePattern.test(question
-							.answer)) {
-						invalidPhoneIndex = index;
+		
+					if (question.type === 'number' && question.title === '联系方式' && !phonePattern.test(question.answer)) {
+						validationResults.invalidPhoneIndex = index;
+					}
+		
+					if (question.type === 'text' && question.title === '邮箱' && !emailPattern.test(question.answer)) {
+						validationResults.invalidEmailIndex = index;
 					}
 				}
+		
+				return validationResults;
+			},
+		
+			handleSubmit() {
+				if (this.isSubmitting) {
+					uni.showToast({
+						title: '正在提交，请稍候...',
+						icon: 'none',
+						duration: 2000
+					});
+					return;
+				}
+				this.isSubmitting = true;
+		
+				uni.showLoading({
+					title: '请求提交中...'
+				});
 
+				const { emptyQuestions, invalidPhoneIndex, invalidIDCardIndex, invalidGradeIndex, invalidEmailIndex, imageIndex } = this.validateInput();
+				
+				let isReurn = false
 				if (emptyQuestions.length > 0) {
 					emptyQuestions.forEach((index) => {
 						const questionTitle = this.survey.questions[index].title;
@@ -267,6 +269,7 @@
 							duration: 2000
 						});
 					});
+					isReurn = true
 				} else if (invalidGradeIndex !== -1) {
 					const questionTitle = this.survey.questions[invalidGradeIndex].title;
 					uni.showToast({
@@ -274,6 +277,7 @@
 						icon: 'none',
 						duration: 2000
 					});
+					isReurn = true
 				} else if (invalidPhoneIndex !== -1) {
 					const questionTitle = this.survey.questions[invalidPhoneIndex].title;
 					uni.showToast({
@@ -281,6 +285,7 @@
 						icon: 'none',
 						duration: 2000
 					});
+					isReurn = true
 				} else if (invalidIDCardIndex !== -1) {
 					const questionTitle = this.survey.questions[invalidIDCardIndex].title;
 					uni.showToast({
@@ -288,76 +293,95 @@
 						icon: 'none',
 						duration: 2000
 					});
-				} else {
-					let that = this
-					uni.uploadFile({
-						url: 'https://collect-and-send-email-admin-lzu.replit.app/upload/',
-						filePath: this.survey.questions[imageIndex].answer,  
-						name: 'file',
-						formData: {
-							g_id_no: this.survey.questions[6].answer, // 身份证号码
-						},
-						success: (res) => {
-							console.log('图片上传成功！');
-							console.log(JSON.parse(res.data));
-							const data = JSON.parse(res.data)
-							that.survey.questions[imageIndex].answer = data.file_url
-							
-							// 最后一步：上传数据到后端
-							const graduate_data = that.survey.questions
-							console.log("graduate_data", graduate_data)
-							uni.request({
-								url: 'https://collect-and-send-email-admin-lzu.replit.app/graduate_add/',
-								method: 'POST',
-								header: {
-									'Content-Type': 'application/x-www-form-urlencoded' // 设置请求头
-								},
-								data: {
-									g_cert_pic: graduate_data[0].answer,
-									g_name: graduate_data[1].answer,
-									g_sex: graduate_data[2].answer,
-									g_college: graduate_data[3].answer,
-									g_major: graduate_data[4].answer,
-									g_year: graduate_data[5].answer,
-									g_id_no: graduate_data[6].answer,
-									g_phone: graduate_data[7].answer,
-									g_mailing_address: graduate_data[8].answer
-								},
-								success: (res) => {
-									uni.showToast({
-										title: `信息上传成功`,
-										icon: 'none',
-										duration: 2000
-									});
-								},
-								fail: (err) => {
-									uni.showToast({
-										title: `信息上传失败：${err.errMsg}`,
-										icon: 'none',
-										duration: 2000
-									});
-								}
-							})
-							
-							
-							
-						},
-						fail: (err) => {
-							uni.showToast({
-								title: `图片上传失败`,
-								icon: 'none',
-								duration: 2000
-							});
-							console.error('图片上传失败！');
-							console.error(err);
-						}
+					isReurn = true
+				} else if (invalidEmailIndex !== -1) {
+					const questionTitle = this.survey.questions[invalidEmailIndex].title;
+					uni.showToast({
+						title: `请填写正确的${questionTitle}`,
+						icon: 'none',
+						duration: 2000
 					});
-					console.log(this.survey);
+					isReurn = true
 				}
 				
-				
+				if (isReurn) {
+					this.isSubmitting = false; // 重置提交标志
+					uni.hideLoading();
+					return;
+				}
+		
+				// 提交逻辑
+				let that = this;
+				uni.uploadFile({
+					url: 'http://127.0.0.1:8000/upload/',
+					filePath: this.survey.questions[imageIndex].answer,
+					name: 'file',
+					formData: {
+						g_id_no: this.survey.questions[6].answer, // 身份证号码
+					},
+					success: (res) => {
+						console.log('图片上传成功！');
+						const data = JSON.parse(res.data);
+						that.survey.questions[imageIndex].answer = data.file_url;
+						
+						// 上传数据到后端
+						const graduate_data = that.survey.questions;
+						console.log("graduate_data", graduate_data);
+						uni.request({
+							url: 'http://127.0.0.1:8000/graduate_add/',
+							method: 'POST',
+							header: {
+								'Content-Type': 'application/x-www-form-urlencoded'
+							},
+							data: {
+								g_cert_pic: graduate_data[0].answer,
+								g_name: graduate_data[1].answer,
+								g_sex: graduate_data[2].answer,
+								g_college: graduate_data[3].answer,
+								g_major: graduate_data[4].answer,
+								g_year: graduate_data[5].answer,
+								g_id_no: graduate_data[6].answer,
+								g_phone: graduate_data[7].answer,
+								g_mailing_address: graduate_data[8].answer,
+								g_email: graduate_data[9].answer
+							},
+							success: () => {
+								uni.navigateTo({
+									url: '../index/success'
+								});
+							},
+							fail: (err) => {
+								uni.showToast({
+									title: `信息上传失败：${err.errMsg}`,
+									icon: 'none',
+									duration: 2000
+								});
+							},
+							complete: () => {
+								// 无论成功失败，提交完成后都需要重置提交标志
+								that.isSubmitting = false;
+								uni.hideLoading();
+							}
+						});
+					},
+					fail: (err) => {
+						uni.showToast({
+							title: `图片上传失败`,
+							icon: 'none',
+							duration: 2000
+						});
+						console.error('图片上传失败！');
+						console.error(err);
+						that.isSubmitting = false; // 重置提交标志
+						uni.hideLoading();
+					}
+				});
+								
 				
 			}
+			
+			
+			
 		}
 	};
 </script>
@@ -390,7 +414,7 @@
 	}
 
 	.title {
-		font-size: 70rpx;
+		font-size: 56rpx;
 		font-weight: bold;
 		text-align: center;
 		margin-bottom: 40rpx;
